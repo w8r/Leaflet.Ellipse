@@ -1,0 +1,38 @@
+{
+  "name": "leaflet-ellipse",
+  "version": "0.0.1",
+  "description": "Ellipse support for leaflet",
+  "main": "dist/Ellipse-src.js",
+  "dependencies": {},
+  "devDependencies": {
+    "browserify": "^13.1.1",
+    "eslint": "^3.8.1",
+    "http-server": "^0.9.0",
+    "leaflet": "^1.0.1",
+    "nodemon": "^1.11.0",
+    "uglifyjs": "^2.4.10",
+    "watchify": "^3.7.0"
+  },
+  "scripts": {
+    "start": "watchify -d -v demo/app.js -o demo/bundle.js",
+    "build": "",
+    "test": "echo \"Error: no test specified\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jdfergason/Leaflet.Ellipse.git"
+  },
+  "keywords": [
+    "leaflet",
+    "ellipse",
+    "circle",
+    "vector",
+    "feature"
+  ],
+  "author": "jdfergason, w8r",
+  "license": "Apache 2.0",
+  "bugs": {
+    "url": "https://github.com/jdfergason/Leaflet.Ellipse/issues"
+  },
+  "homepage": "https://github.com/jdfergason/Leaflet.Ellipse#readme"
+}
