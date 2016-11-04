@@ -181,6 +181,9 @@ L.Ellipse = L.Path.extend({
   },
 
 
+  /**
+   * Following the L.Circle example
+   */
   _update: function () {
     if (this._map) {
 			this._updatePath();
@@ -243,6 +246,12 @@ L.Ellipse = L.Path.extend({
   },
 
 
+  /**
+   * Point in ellipse checker
+   * https://math.stackexchange.com/questions/76457/check-if-a-point-is-within-an-ellipse/76463#76463
+   * @param  {L.Point} p
+   * @return {Boolean}
+   */
   _containsPoint: function (p) {
     var c = this._point;
     var padding = this._clickTolerance();
@@ -266,6 +275,7 @@ L.ellipse = function (latlng, options) {
 
 
 /**
+ * SVG/VML paths
  * @param {L.Point} center
  * @param {Object}  endPoint
  * @param {Number}  rx
@@ -310,6 +320,10 @@ L.SVG.include({
 
 
 L.Canvas.include({
+
+  /**
+   * @param  {L.Ellipse} layer
+   */
   _updateEllipse: function (layer) {
     if (layer._empty()) { return; }
 
