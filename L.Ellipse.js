@@ -1,4 +1,6 @@
 /**
+ * @preserve
+ * Copyright 2016 A Milevski <info@w8r.name>
  * Copyright 2014 JD Fergason
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,180 +34,306 @@
    }
  })(function(L) {
 
+var DEG_TO_RAD = Math.PI / 180;
+
 L.Ellipse = L.Path.extend({
 
   options: {
     fill:       true,
     startAngle: 0,
-    endAngle:   359.9
+    endAngle:   360
   },
 
 
-  initialize: function (latlng, radii, tilt, options) {
-    L.Path.prototype.initialize.call(this, options);
-    this._latlng = L.latLng(latlng);
+  /**
+   * @constructs
+   * @param  {L.LatLng} latlng
+   * @param  {Object}   options
+   * @param  {Array.<Number>|L.Point} options.radius Radiuses
+   * @param  {Number} options.tilt Tilt angle (deg)
+   * @param  {Number} options.startAngle Start angle (deg)
+   * @param  {Number} options.endAngle   End angle (deg)
+   */
+  initialize: function (latlng, options) {
+    L.Util.setOptions(this, options);
+    this.setLatLng(latlng);
 
-    if (tilt) {
-      this._tiltDeg = tilt;
-    } else {
-      this._tiltDeg = 0;
+    this._tilt = this.options.tilt || 0;
+
+    if (this.options.endAngle === 360) {
+      this.options.endAngle -= 1e-5;
     }
 
-    if (radii) {
-      this._mRadiusX = radii[0];
-      this._mRadiusY = radii[1];
-    }
+    this.setRadius(options.radius);
+    //this._bounds = this.getBounds();
   },
 
 
+  /**
+   * @param {L.LatLng} latlng
+   * @return {L.Ellipse}
+   */
   setLatLng: function (latlng) {
     this._latlng = L.latLng(latlng);
     return this.redraw();
   },
 
 
-  setRadius: function (radii) {
-    this._mRadiusX = radii[0];
-    this._mRadiusY = radii[1];
-    return this.redraw();
-  },
-
-
-  setTilt: function (tilt) {
-    this._tiltDeg = tilt;
-    return this.redraw();
-  },
-
-
-  projectLatlngs: function () {
-    var lngRadius = this._getLngRadius();
-        latRadius = this._getLatRadius(),
-        latlng = this._latlng, map = this._map,
-        pointLeft  = map.latLngToLayerPoint([latlng.lat, latlng.lng - lngRadius]),
-        pointBelow = map.latLngToLayerPoint([latlng.lat - latRadius, latlng.lng]);
-
-    this._point   = map.latLngToLayerPoint(latlng);
-    this._radiusX = Math.max(this._point.x - pointLeft.x, 1);
-    this._radiusY = Math.max(pointBelow.y - this._point.y, 1);
-    this._endPointParams = this._centerPointToEndPoint();
-  },
-
-  getBounds: function () {
-    var lngRadius = this._getLngRadius(),
-        latRadius = this._getLatRadius(),
-        latlng    = this._latlng;
-
-    return new L.LatLngBounds(
-      [latlng.lat - latRadius, latlng.lng - lngRadius],
-      [latlng.lat + latRadius, latlng.lng + lngRadius]
-    );
-  },
-
-
+  /**
+   * @return {L.LatLng}
+   */
   getLatLng: function () {
     return this._latlng;
   },
 
 
-  getPathString: function () {
-    var c        = this._point,
-        rx       = this._radiusX,
-        ry       = this._radiusY,
-        phi      = this._tiltDeg,
-        endPoint = this._endPointParams;
-
-    if (this._checkIfEmpty()) {
-        return '';
-    }
-
-    if (L.Browser.svg) {
-      return 'M' + endPoint.x0 + ',' + endPoint.y0 +
-             'A' + rx + ',' + ry + ',' + phi + ',' +
-             endPoint.largeArc + ',' + endPoint.sweep + ',' +
-             endPoint.x1 + ',' + endPoint.y1 + ' z';
-    } else {
-      c._round();
-      rx = Math.round(rx);
-      ry = Math.round(ry);
-      return 'AL ' + c.x + ',' + c.y + ' ' + rx + ',' + ry +
-             ' ' + phi + ',' + (65535 * 360);
-    }
+  /**
+   * @param {Array.<Number>|L.Point} radii
+   */
+  setRadius: function (radii) {
+    radii = L.point(radii);
+    this._mRadiusX = radii.x;
+    this._mRadiusY = radii.y;
+    return this.redraw();
   },
 
 
+  /**
+   * @return {L.Point}
+   */
   getRadius: function () {
-    return new L.point(this._mRadiusX, this._mRadiusY);
+    return new L.Point(this._mRadiusX, this._mRadiusY);
   },
 
 
-  // TODO Earth hardcoded, move into projection code!
+  /**
+   * @param {Number} tilt
+   */
+  setTilt: function (tilt) {
+    this._tilt = tilt;
+    return this.redraw();
+  },
+
+
+  _updateBounds: function () {
+    var map      = this._map;
+    var w        = this._clickTolerance();
+    var padding  = new L.Point(w, -w);
+    this._bounds = this._bounds || this.getBounds();
+    var bounds   = this._bounds;
+
+    if (bounds.isValid()) {
+      this._pxBounds = new L.Bounds(
+        map.latLngToLayerPoint(bounds.getSouthWest())._subtract(padding),
+        map.latLngToLayerPoint(bounds.getNorthEast())._add(padding));
+    }
+  },
+
+
+  _project: function () {
+    this._point = this._map.latLngToLayerPoint(this._latlng);
+    this._projectLatlngs();
+    this._updateBounds();
+  },
+
+
+  _projectLatlngs: function () {
+    var map    = this._map;
+    var crs    = map.options.crs;
+    var latlng = this._latlng;
+
+    this._point    = map.latLngToLayerPoint(latlng);
+    if (crs.distance === L.CRS.Earth.distance) {
+      var lat        = latlng.lat, lng = latlng.lng;
+      var latR       = (this._mRadiusY / L.CRS.Earth.R) / DEG_TO_RAD;
+      var top        = map.project([lat + latR, lng]);
+      var bottom     = map.project([lat - latR, lng]);
+      var projCenter = top.add(bottom).divideBy(2);
+      var lat2       = map.unproject(projCenter).lat;
+      var lngR2      = (Math.acos((Math.cos(latR * DEG_TO_RAD) -
+         Math.sin(lat * DEG_TO_RAD) * Math.sin(lat2 * DEG_TO_RAD)) /
+        (Math.cos(lat * DEG_TO_RAD) * Math.cos(lat2 * DEG_TO_RAD))) / DEG_TO_RAD)
+        * this._mRadiusX / this._mRadiusY;
+
+      this._radiusX = this._point.x - map.latLngToLayerPoint([lat, lng - lngR2]).x;
+      this._radiusY = this._point.y - map.latLngToLayerPoint([lat + latR, lng]).y;
+    } else {
+      var latlng2 = crs.unproject(crs.project(this._latlng)
+        .subtract([this._mRadiusX, -this._mRadiusY]));
+      var topLeft = map.latLngToLayerPoint(latlng2);
+
+			this._radiusX = this._point.x - topLeft.x;
+      this._radiusY = this._point.y - topLeft.y;
+    }
+    this._endPointParams = this._centerPointToEndPoint();
+  },
+
+
+  /**
+   * @return {L.LatLngBounds}
+   */
+  getBounds: function () {
+  	var half = [this._radiusX, this._radiusY];
+
+  	return new L.LatLngBounds(
+  		this._map.layerPointToLatLng(this._point.subtract(half)),
+  		this._map.layerPointToLatLng(this._point.add(half)));
+  },
+
+
+  _update: function () {
+    if (this._map) {
+			this._updatePath();
+		}
+  },
+
+
+  _updatePath: function () {
+    this._renderer._updateEllipse(this);
+  },
+
+
+  /**
+   * Convert between center point parameterization of an ellipse
+   * too SVG's end-point and sweep parameters.  This is an
+   * adaptation of the perl code found here:
+   * http://commons.oreilly.com/wiki/index.php/SVG_Essentials/Paths
+   */
   _centerPointToEndPoint: function () {
-    // Convert between center point parameterization of an ellipse
-    // too SVG's end-point and sweep parameters.  This is an
-    // adaptation of the perl code found here:
-    // http://commons.oreilly.com/wiki/index.php/SVG_Essentials/Paths
     var c      = this._point,
         rx     = this._radiusX,
         ry     = this._radiusY,
-        theta2 = (this.options.startAngle + this.options.endAngle) *
-                 L.LatLng.DEG_TO_RAD,
-        theta1 = this.options.startAngle * L.LatLng.DEG_TO_RAD,
-        delta  = this.options.endAngle,
-        phi    = this._tiltDeg * L.LatLng.DEG_TO_RAD;
+        opts   = this.options,
+        theta2 = (opts.startAngle + opts.endAngle) * DEG_TO_RAD,
+        theta1 = opts.startAngle * DEG_TO_RAD,
+        delta  = opts.endAngle,
+        phi    = this._tilt * DEG_TO_RAD;
+
+    var cosPhi    = Math.cos(phi), sinMPhi = Math.sin(-phi), sinPhi = Math.sin(phi);
+    var sinTheta1 = Math.sin(theta1), cosTheta1 = Math.cos(theta1);
+    var sinTheta2 = Math.sin(theta2), cosTheta2 = Math.cos(theta2);
 
     // Determine start and end-point coordinates
-    var x0 = c.x + Math.cos(phi) * rx * Math.cos(theta1) +
-             Math.sin(-phi) * ry * Math.sin(theta1);
-    var y0 = c.y + Math.sin(phi) * rx * Math.cos(theta1) +
-             Math.cos(phi) * ry * Math.sin(theta1);
+    var x0 = c.x + cosPhi * rx * cosTheta1 + sinMPhi * ry * sinTheta1;
+    var y0 = c.y + sinPhi * rx * cosTheta1 + cosPhi  * ry * sinTheta1;
 
-    var x1 = c.x + Math.cos(phi) * rx * Math.cos(theta2) +
-             Math.sin(-phi) * ry * Math.sin(theta2);
-    var y1 = c.y + Math.sin(phi) * rx * Math.cos(theta2) +
-             Math.cos(phi) * ry * Math.sin(theta2);
-
-    var largeArc = (delta > 180) ? 1 : 0;
-    var sweep    = (delta > 0)   ? 1 : 0;
+    var x1 = c.x + cosPhi * rx * cosTheta2 + sinMPhi * ry * sinTheta2;
+    var y1 = c.y + sinPhi * rx * cosTheta2 + cosPhi  * ry * sinTheta2;
 
     return {
-      'x0': x0,
-      'y0': y0,
-      'tilt': phi,
-      'largeArc': largeArc,
-      'sweep': sweep,
-      'x1': x1,
-      'y1': y1
+      'x0':       x0,
+      'y0':       y0,
+      'tilt':     phi,
+      'largeArc': (delta > 180) ? 1 : 0,
+      'sweep':    (delta > 0)   ? 1 : 0,
+      'x1':       x1,
+      'y1':       y1
     };
   },
 
 
-  _getLatRadius: function () {
-    return (this._mRadiusY / 40075017) * 360;
+  /**
+   * Checks if ellipse is visible or inside of the viewport
+   * @return {Boolean}
+   */
+  _empty: function () {
+    return this._mRadiusX &&
+      !this._renderer._bounds.contains(this._pxBounds) &&
+      !this._renderer._bounds.intersects(this._pxBounds);
   },
 
 
-  _getLngRadius: function () {
-    return ((this._mRadiusX / 40075017) * 360) /
-      Math.cos(L.LatLng.DEG_TO_RAD * this._latlng.lat);
+  _containsPoint: function (p) {
+    var c = this._point;
+    var padding = this._clickTolerance();
+    var dx = (p.x - c.x), dy = (p.y - c.y);
+    var rx = this._radiusX + padding, ry = this._radiusY + padding;
+  	return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
   },
 
+});
 
-  _checkIfEmpty: function () {
-    if (!this._map) {
-      return false;
+
+/**
+ * Factory
+ * @param  {L.LatLng} latlng
+ * @param  {Object}   options
+ * @return {L.Ellipse}
+ */
+L.ellipse = function (latlng, options) {
+  return new L.Ellipse(latlng, options);
+};
+
+
+/**
+ * @param {L.Point} center
+ * @param {Object}  endPoint
+ * @param {Number}  rx
+ * @param {Number}  ry
+ * @param {Number}  phi
+ */
+L.SVG.getEllipsePath = L.Browser.svg ? function (center, endPoint, rx, ry, phi) {
+  return 'M' + endPoint.x0 + ',' + endPoint.y0 +
+         'A' + rx + ',' + ry + ',' + phi + ',' +
+         endPoint.largeArc + ',' + endPoint.sweep + ',' +
+         endPoint.x1 + ',' + endPoint.y1 + ' z';
+} : function (center, endPoint, rx, ry, phi) {
+  var round = Math.round;
+  return 'AL ' + round(center.x) + ',' + round(center.y) + ' ' +
+         round(rx) + ',' + round(ry) +
+         ' ' + phi + ',' + (65535 * 360);
+};
+
+
+L.SVG.include({
+
+  /**
+   * @param  {L.Ellipse} layer
+   */
+  _updateEllipse: function (layer) {
+    var c = this._point, path,
+        rx = this._radiusX,
+        ry = this._radiusY,
+        phi = this._tilt,
+        endPoint = this._endPointParams;
+
+    if (layer._empty()) {
+      path = 'M0 0';
     }
-    var vp = this._map._pathViewport,
-         r = this._radiusX,
-         p = this._point;
 
-    return p.x - r > vp.max.x || p.y - r > vp.max.y ||
-           p.x + r < vp.min.x || p.y + r < vp.min.y;
+    this._setPath(layer,
+      L.SVG.getEllipsePath(layer._point,   layer._endPointParams,
+                           layer._radiusX, layer._radiusY, layer._tilt));
   }
 
 });
 
-L.ellipse = function (latlng, radii, tilt, options) {
-    return new L.Ellipse(latlng, radii, tilt, options);
-};
+
+L.Canvas.include({
+  _updateEllipse: function (layer) {
+    if (layer._empty()) { return; }
+
+		var p = layer._point,
+		    ctx = this._ctx,
+		    r = layer._radiusX,
+		    s = (layer._radiusY || r) / r;
+
+		this._drawnLayers[layer._leaflet_id] = layer;
+
+		if (s !== 1) {
+			ctx.save();
+			ctx.scale(1, s);
+		}
+
+		ctx.beginPath();
+		ctx.arc(p.x, p.y / s, r, 0, Math.PI * 2, false);
+
+		if (s !== 1) {
+			ctx.restore();
+		}
+
+		this._fillStroke(ctx, layer);
+  }
+});
 
 });

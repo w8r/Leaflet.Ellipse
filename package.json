@@ -14,7 +14,7 @@
     "watchify": "^3.7.0"
   },
   "scripts": {
-    "start": "watchify -d -v demo/app.js -o demo/bundle.js",
+    "start": "watchify -v -d demo/app.js -o demo/bundle.js & http-server -p 3003",
     "build": "",
     "test": "echo \"Error: no test specified\" && exit 0"
   },
