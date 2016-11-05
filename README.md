@@ -1,7 +1,7 @@
 Leaflet.ellipse
 ===============
 
-A basic ellipse type for [Leaflet](http://leafletjs.com), a JS 
+A basic ellipse type for [Leaflet](http://leafletjs.com), a JS
 library for interactive maps.  Allows specification of semi-major and
 semi-minor axis as well as a tilt degrees from west.
 
@@ -32,8 +32,14 @@ After instantiating the map create a new ellipse.
 
 *Factory method*
 
-    L.ellipse( <LatLng> latlng, <Radii> radii, <Number> tilt, 
-               <Path options> options? )
+```js
+    L.ellipse( <LatLng> latlng, {
+      radius:     <L.Point|[x, y]>,
+      startAngle: <Number>,
+      endAngle:   <Number>,
+      tilt:       <Number>,
+      <PathOptions> ...options)
+```
 
  * latlng  - The position of the center of the ellipse.
  * radii   - The semi-major and semi-minor axis in meters

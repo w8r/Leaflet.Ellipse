@@ -36,6 +36,11 @@
 
 var DEG_TO_RAD = Math.PI / 180;
 
+
+/**
+ * @class L.Ellipse
+ * @extends L.Path
+ */
 L.Ellipse = L.Path.extend({
 
   options: {

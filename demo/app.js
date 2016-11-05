@@ -20,7 +20,8 @@ var ellipse = global.ellipse = L.ellipse(center, {
   radius: [750, 1500],
   color: '#f00',
   weight: 2,
-  renderer: canvasRenderer,
+  //tilt: 45,
+  //renderer: canvasRenderer,
   interactive: true
 }).addTo(map);
 
