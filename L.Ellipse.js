@@ -332,26 +332,26 @@ L.Canvas.include({
   _updateEllipse: function (layer) {
     if (layer._empty()) { return; }
 
-		var p = layer._point,
-		    ctx = this._ctx,
-		    r = layer._radiusX,
-		    s = (layer._radiusY || r) / r;
+    var p = layer._point,
+        ctx = this._ctx,
+        r = layer._radiusX,
+        s = (layer._radiusY || r) / r;
 
-		this._drawnLayers[layer._leaflet_id] = layer;
+    this._drawnLayers[layer._leaflet_id] = layer;
 
-		if (s !== 1) {
-			ctx.save();
-			ctx.scale(1, s);
-		}
+    if (s !== 1) {
+    	ctx.save();
+    	ctx.scale(1, s);
+    }
 
-		ctx.beginPath();
-		ctx.arc(p.x, p.y / s, r, 0, Math.PI * 2, false);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y / s, r, 0, Math.PI * 2, false);
 
-		if (s !== 1) {
-			ctx.restore();
-		}
+    if (s !== 1) {
+    	ctx.restore();
+    }
 
-		this._fillStroke(ctx, layer);
+    this._fillStroke(ctx, layer);
   }
 });
 

@@ -2,7 +2,7 @@
   "name": "leaflet-ellipse",
   "version": "0.0.1",
   "description": "Ellipse support for leaflet",
-  "main": "dist/Ellipse-src.js",
+  "main": "L.Ellipse.js",
   "dependencies": {},
   "devDependencies": {
     "browserify": "^13.1.1",
