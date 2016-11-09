@@ -55,7 +55,7 @@ L.Ellipse = L.Path.extend({
    * @param  {L.LatLng} latlng
    * @param  {Object}   options
    * @param  {Array.<Number>|L.Point} options.radius Radiuses
-   * @param  {Number} options.tilt Tilt angle (deg)
+   * @param  {Number} options.rotation   Rotation angle (deg)
    * @param  {Number} options.startAngle Start angle (deg)
    * @param  {Number} options.endAngle   End angle (deg)
    */
@@ -63,14 +63,13 @@ L.Ellipse = L.Path.extend({
     L.Util.setOptions(this, options);
     this.setLatLng(latlng);
 
-    this._tilt = this.options.tilt || 0;
+    this.setRotation(this.options.rotation || 0, true);
 
     if (this.options.endAngle === 360) {
       this.options.endAngle -= 1e-5;
     }
 
     this.setRadius(options.radius);
-    //this._bounds = this.getBounds();
   },
 
 
@@ -99,6 +98,7 @@ L.Ellipse = L.Path.extend({
     radii = L.point(radii);
     this._mRadiusX = radii.x;
     this._mRadiusY = radii.y;
+    this._bounds   = null;
     return this.redraw();
   },
 
@@ -112,11 +112,16 @@ L.Ellipse = L.Path.extend({
 
 
   /**
-   * @param {Number} tilt
+   * @param {Number} rotation
    */
-  setTilt: function (tilt) {
-    this._tilt = tilt;
-    return this.redraw();
+  setRotation: function (rotation, noRedraw) {
+    this._rotation = rotation * DEG_TO_RAD;
+
+    // cache sin and cos for point-in-ellipse calculation
+    this._sinTheta = Math.sin(this._rotation);
+    this._cosTheta = Math.cos(this._rotation);
+    this._bounds   = null;
+    return noRedraw ? this : this.redraw();
   },
 
 
@@ -178,11 +183,18 @@ L.Ellipse = L.Path.extend({
    * @return {L.LatLngBounds}
    */
   getBounds: function () {
-  	var half = [this._radiusX, this._radiusY];
+    var rx  = this._radiusX, ry = this._radiusY;
+    var cx  = this._point.x, cy = this._point.y;
+    var cos = this._cosTheta, sin = this._sinTheta;
+
+    var dx  = Math.sqrt(rx * rx * cos * cos + ry * ry * sin * sin);
+    var dy  = Math.sqrt(rx * rx * sin * sin + ry * ry * cos * cos);
+
+    var offset = [dx, dy];
 
   	return new L.LatLngBounds(
-  		this._map.layerPointToLatLng(this._point.subtract(half)),
-  		this._map.layerPointToLatLng(this._point.add(half)));
+  		this._map.layerPointToLatLng(this._point.subtract(offset)),
+  		this._map.layerPointToLatLng(this._point.add(offset)));
   },
 
 
@@ -215,7 +227,7 @@ L.Ellipse = L.Path.extend({
         theta2 = (opts.startAngle + opts.endAngle) * DEG_TO_RAD,
         theta1 = opts.startAngle * DEG_TO_RAD,
         delta  = opts.endAngle,
-        phi    = this._tilt * DEG_TO_RAD;
+        phi    = this._rotation * DEG_TO_RAD;
 
     var cosPhi    = Math.cos(phi), sinMPhi = Math.sin(-phi), sinPhi = Math.sin(phi);
     var sinTheta1 = Math.sin(theta1), cosTheta1 = Math.cos(theta1);
@@ -231,7 +243,7 @@ L.Ellipse = L.Path.extend({
     return {
       'x0':       x0,
       'y0':       y0,
-      'tilt':     phi,
+      'rotation':     phi,
       'largeArc': (delta > 180) ? 1 : 0,
       'sweep':    (delta > 0)   ? 1 : 0,
       'x1':       x1,
@@ -252,17 +264,23 @@ L.Ellipse = L.Path.extend({
 
 
   /**
-   * Point in ellipse checker
-   * https://math.stackexchange.com/questions/76457/check-if-a-point-is-within-an-ellipse/76463#76463
+   * Point in ellipse checker, uses ellipse equasion
+   *
    * @param  {L.Point} p
    * @return {Boolean}
    */
   _containsPoint: function (p) {
-    var c = this._point;
+    var c       = this._point;
     var padding = this._clickTolerance();
-    var dx = (p.x - c.x), dy = (p.y - c.y);
-    var rx = this._radiusX + padding, ry = this._radiusY + padding;
-  	return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
+    var cos     = this._cosTheta,
+        sin     = this._sinTheta;
+    var dx      = (p.x - c.x), dy = (p.y - c.y);
+    var rx      = this._radiusX + padding,
+        ry      = this._radiusY + padding;
+    var tdx     = cos * dx + sin * dy,
+        tdy     = sin * dx - cos * dy;
+
+  	return (tdx * tdx) / (rx * rx) + (tdy * tdy) / (ry * ry) <= 1;
   },
 
 });
@@ -309,7 +327,7 @@ L.SVG.include({
     var c = this._point, path,
         rx = this._radiusX,
         ry = this._radiusY,
-        phi = this._tilt,
+        phi = this._rotation,
         endPoint = this._endPointParams;
 
     if (layer._empty()) {
@@ -318,11 +336,34 @@ L.SVG.include({
 
     this._setPath(layer,
       L.SVG.getEllipsePath(layer._point,   layer._endPointParams,
-                           layer._radiusX, layer._radiusY, layer._tilt));
+                           layer._radiusX, layer._radiusY, layer._rotation));
   }
 
 });
 
+
+if (!CanvasRenderingContext2D.prototype.ellipse) {
+  /**
+   * Canvas2D ellipse polyfill
+   * @param  {Number} x
+   * @param  {Number} y
+   * @param  {Number} radiusX
+   * @param  {Number} radiusY
+   * @param  {Number} rotation Radians
+   * @param  {Number} startAngle Degrees
+   * @param  {Number} endAngle Degrees
+   * @param  {Boolean} antiClockwise
+   */
+  CanvasRenderingContext2D.prototype.ellipse = function(x, y, radiusX, radiusY,
+        rotation, startAngle, endAngle, antiClockwise) {
+    this.save();
+    this.translate(x, y);
+    this.rotate(rotation);
+    this.scale(radiusX, radiusY);
+    this.arc(0, 0, 1, startAngle, endAngle, antiClockwise);
+    this.restore();
+  }
+}
 
 L.Canvas.include({
 
@@ -333,23 +374,19 @@ L.Canvas.include({
     if (layer._empty()) { return; }
 
     var p = layer._point,
-        ctx = this._ctx,
-        r = layer._radiusX,
-        s = (layer._radiusY || r) / r;
+        options = layer.options,
+        ctx = this._ctx;
 
     this._drawnLayers[layer._leaflet_id] = layer;
 
-    if (s !== 1) {
-    	ctx.save();
-    	ctx.scale(1, s);
-    }
-
     ctx.beginPath();
-    ctx.arc(p.x, p.y / s, r, 0, Math.PI * 2, false);
-
-    if (s !== 1) {
-    	ctx.restore();
-    }
+    ctx.ellipse(
+      p.x, p.y,
+      layer._radiusX, layer._radiusY,
+      layer._rotation,
+      options.startAngle * DEG_TO_RAD,
+      options.endAngle * DEG_TO_RAD, false);
+    ctx.closePath();
 
     this._fillStroke(ctx, layer);
   }

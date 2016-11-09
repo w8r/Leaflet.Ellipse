@@ -2,8 +2,12 @@
 <html>
   <head>
     <title>L.Ellipse</title>
+    <script src="../node_modules/leaflet/dist/leaflet-src.js"></script>
+    <link href="../node_modules/leaflet/dist/leaflet.css" rel="stylesheet">
+    <!--
     <script src="//unpkg.com/leaflet@1.0.1/dist/leaflet-src.js"></script>
     <link href="//unpkg.com/leaflet@1.0.1/dist/leaflet.css" rel="stylesheet">
+    -->
     <script src="../L.Ellipse.js"></script>
     <style>
     html, body, #map {
@@ -12,10 +16,37 @@
       margin: 0;
       padding: 0;
     }
+    .ellipse-control {
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-weight: 300;
+      padding: 15px;
+      background: #fff;
+      z-index: 900;
+      width: 200px;
+    }
+
+    .ellipse-control label {
+      display: block;
+    }
+
+    .ellipse-control label input {
+      width: 80px;
+    }
     </style>
   </head>
   <body>
     <div id="map"></div>
+    <div class="leaflet-bar ellipse-control">
+      <h1>L.Ellipse</h1>
+      <form id="ellipse-form">
+        <label for="radius-x"><input name="radiusX" type="number" min="10" value="750" step="50"> X Radius (m)</label>
+        <label for="radius-y"><input name="radiusY" type="number" min="10" value="1500" step="50"> Y Radius (m)</label>
+        <label for="tilt"><input name="tilt" type="number" max="360" min="0" value="85" step="5"> Tilt &deg;</label>
+      </form>
+    </div>
     <script src="bundle.js"></script>
   </body>
 </html>

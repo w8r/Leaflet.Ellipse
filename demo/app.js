@@ -14,15 +14,31 @@ var canvasRenderer = new L.Canvas();
 var circle = L.circle(center, {
   radius: 750,
   renderer: canvasRenderer
-}).addTo(map);
+});//.addTo(map);
 
 var ellipse = global.ellipse = L.ellipse(center, {
   radius: [750, 1500],
   color: '#f00',
   weight: 2,
-  //tilt: 45,
-  //renderer: canvasRenderer,
+  rotation: 45,
+  renderer: canvasRenderer,
   interactive: true
 }).addTo(map);
 
 map.fitBounds(ellipse.getBounds(), { animate: false });
+
+var form = document.querySelector('#ellipse-form');
+function update () {
+  var tilt    = parseFloat(form['tilt'].value);
+  var radiusX = parseFloat(form['radiusX'].value);
+  var radiusY = parseFloat(form['radiusY'].value);
+
+  ellipse.setRotation(tilt);
+  ellipse.setRadius([radiusX, radiusY]);
+}
+
+L.DomEvent
+  .on(form, 'change', update)
+  .on(form, 'submit', L.Util.falseFn);
+
+update();
