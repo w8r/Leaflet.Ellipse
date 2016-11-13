@@ -5,6 +5,10 @@ var flat = L.Util.extend({}, L.CRS.Simple, {
 var wgs  = L.CRS.EPSG4326;
 var goog = L.CRS.EPSG3857;
 
+L.Bounds.prototype.toString = function () {
+  return [this.min.x, this.min.y, this.max.x, this.max.y].join(',');
+}
+
 var map  = global.map = L.map('map', {
   crs: flat,
   maxZoom: 22
@@ -14,14 +18,14 @@ var canvasRenderer = new L.Canvas();
 var circle = L.circle(center, {
   radius: 750,
   renderer: canvasRenderer
-});//.addTo(map);
+}).addTo(map);
 
 var ellipse = global.ellipse = L.ellipse(center, {
   radius: [750, 1500],
   color: '#f00',
   weight: 2,
   rotation: 45,
-  renderer: canvasRenderer,
+  //renderer: canvasRenderer,
   interactive: true
 }).addTo(map);
 
@@ -32,9 +36,14 @@ function update () {
   var tilt    = parseFloat(form['tilt'].value);
   var radiusX = parseFloat(form['radiusX'].value);
   var radiusY = parseFloat(form['radiusY'].value);
+  // var startAngle = parseFloat(form['startAngle'].value);
+  // var endAngle   = parseFloat(form['endAngle'].value);
+  // form['endAngle'].min = startAngle;
+  // form['startAngle'].max = endAngle;
 
   ellipse.setRotation(tilt);
   ellipse.setRadius([radiusX, radiusY]);
+  // ellipse.setAngles(startAngle, endAngle);
 }
 
 L.DomEvent
